@@ -3,6 +3,8 @@ import cors from "cors";
 import mongoose from "mongoose";
 import dotenv from 'dotenv';
 import axios from "axios";
+import routes from "./routes/index.js"
+
 
 dotenv.config();
 
@@ -13,11 +15,10 @@ app.use(cors());
 app.use(express.json());  
 
 // MongoDB Connection
-// mongoose.connect(process.env.MONGO_URI)
-// .then(() => console.log('Connected to MongoDB...'))
-// .catch((err) => console.log('Error connecting to MongoDB:', err));
+mongoose.connect(process.env.MONGO_URI)
+.then(() => console.log('Connected to MongoDB...'))
+.catch((err) => console.log('Error connecting to MongoDB:', err));
 
-// Load API key from environment variables
 const apiKey = process.env.GROQ_API_KEY;
 if (!apiKey) {
   console.error("API key is missing. Please check your .env file.");
@@ -57,6 +58,7 @@ app.post('/api/chat', async (req, res) => {
 });
 
 
+app.use("/api", routes);
 
 app.listen(port, ()=> {
     console.log(`Server is running at port ${port}...`)
