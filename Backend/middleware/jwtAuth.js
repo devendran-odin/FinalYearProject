@@ -9,7 +9,7 @@ export const authenticateToken = (req, res, next) => {
   }
 
   // Verify the token using the secret key
-  jwt.verify(token, process.env.JWT_SECRET_KEY, (err, decoded) => {
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
     if (err) {
       return res.status(403).json({ message: "Invalid or expired token." });
     }

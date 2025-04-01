@@ -11,23 +11,26 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { LogIn } from "lucide-react";
+import toast from "react-hot-toast";
 
 export default function Login() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [credentials, setCredentials] = useState({
+    email: "",
+    password: "",
+  });
 
-  const validateForm = (formData) => {
+  const validateForm = () => {
     const newErrors = {};
+    const { email, password } = credentials;
 
-    const email = formData.get("email");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       newErrors.email = "Please enter a valid email address";
     }
 
-    const password = formData.get("password");
     if (password.length < 6) {
       newErrors.password = "Password must be at least 6 characters long";
     }
@@ -36,21 +39,46 @@ export default function Login() {
     return Object.keys(newErrors).length === 0;
   };
 
+  const handleChange = (e) => {
+    setCredentials({ ...credentials, [e.target.name]: e.target.value });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const form = e.target;
-    const formData = new FormData(form);
 
-    if (!validateForm(formData)) {
-      return;
-    }
+    if (!validateForm()) return;
 
     setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_BACKEND_URL}/api/users/login`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(credentials),
+        }
+      );
+
+      const data = await response.json();
       setLoading(false);
-      navigate("/dashboard");
-    }, 1500);
+
+      if (!response.ok) {
+        throw new Error(data.message || "Login failed");
+      }
+
+      // Save token & user details in localStorage or state management
+      localStorage.setItem("token", data.token);
+
+      toast.success("Login successful!");
+      navigate("/profile");
+      setTimeout(() => {
+        window.location.reload();
+      }, 300);
+    } catch (error) {
+      setLoading(false);
+      console.error("Login Error:", error);
+      toast.error(error.message);
+    }
   };
 
   return (
@@ -67,12 +95,15 @@ export default function Login() {
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="grid gap-4">
+            {/* Email Field */}
             <div className="grid gap-2">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 name="email"
                 type="email"
+                value={credentials.email}
+                onChange={handleChange}
                 placeholder="john@example.com"
                 required
                 className={`bg-white ${errors.email ? "border-red-500" : ""}`}
@@ -81,6 +112,8 @@ export default function Login() {
                 <span className="text-sm text-red-500">{errors.email}</span>
               )}
             </div>
+
+            {/* Password Field */}
             <div className="grid gap-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
@@ -95,6 +128,8 @@ export default function Login() {
                 id="password"
                 name="password"
                 type="password"
+                value={credentials.password}
+                onChange={handleChange}
                 required
                 className={`bg-white ${
                   errors.password ? "border-red-500" : ""
@@ -105,6 +140,8 @@ export default function Login() {
               )}
             </div>
           </CardContent>
+
+          {/* Submit Button */}
           <CardFooter className="flex flex-col gap-4">
             <Button
               type="submit"

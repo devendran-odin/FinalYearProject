@@ -6,6 +6,7 @@ import Register from "./Pages/Register";
 import Navbar from "./Pages/Navbar";
 import Mentors from "./Pages/Mentors";
 import Chat from "./Pages/Chat";
+import UserProfile from "./Pages/UserProfile";
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/mentors" element={<Mentors />} />
           <Route path="/chat" element={<Chat />} />
+          <Route path="/profile" element={<UserProfile />} />
         </Routes>
       </div>
     </Router>

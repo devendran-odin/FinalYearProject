@@ -1,7 +1,22 @@
 import logo from "../assets/Logo1.png";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 
 const Navbar = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    setIsAuthenticated(!!token); // Set true if token exists
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("token"); // Clear token
+    setIsAuthenticated(false); // Update state
+    navigate("/login"); // Redirect to login page
+  };
+
   return (
     <>
       {/* ========== HEADER ========== */}
@@ -90,22 +105,37 @@ const Navbar = () => {
               >
                 Mentors
               </Link>
-              <Link
-                className="pe-3 ps-px sm:px-3 md:py-4 text-sm text-gray-900 hover:text-gray-500 "
-                to="/login"
-                aria-current="page"
-              >
-                Login
-              </Link>
-
-              <div>
-                <Link
-                  to="/register"
-                  className="group inline-flex items-center gap-x-2 py-2 px-4 bg-blue-600 font-medium text-sm text-gray-50 rounded-full focus:outline-hidden"
-                >
-                  Register
-                </Link>
-              </div>
+              {isAuthenticated ? (
+                <>
+                  <button
+                    onClick={handleLogout}
+                    className="text-sm text-gray-900 hover:text-gray-500 ml-1 mr-4 "
+                  >
+                    Logout
+                  </button>
+                  <Link
+                    to="/profile"
+                    className="py-2 px-4 bg-blue-600 text-white text-sm rounded-full hover:bg-blue-700 transition"
+                  >
+                    Profile
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    className="text-sm ml-1 mr-4 text-gray-900 hover:text-gray-500"
+                  >
+                    Login
+                  </Link>
+                  <Link
+                    to="/register"
+                    className="py-2 px-4 bg-blue-600 text-white text-sm rounded-full"
+                  >
+                    Register
+                  </Link>
+                </>
+              )}
             </div>
           </div>
           {/* End Collapse */}
