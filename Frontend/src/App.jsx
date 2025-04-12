@@ -6,7 +6,8 @@ import Register from "./Pages/Register";
 import Navbar from "./Pages/Navbar";
 import Mentors from "./Pages/Mentors";
 import Chat from "./Pages/Chat";
-import UserProfile from "./Pages/UserProfile";
+import Profile from "./Pages/Profile";
+import About from "./Pages/About";
 
 function App() {
   return (
@@ -18,12 +19,20 @@ function App() {
       >
         <Navbar />
         <Routes>
-          <Route path="/" element={<HeroSection />} />
+          <Route
+            path="/"
+            element={
+              <>
+                <HeroSection />
+                <About />
+              </>
+            }
+          />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/mentors" element={<Mentors />} />
           <Route path="/chat" element={<Chat />} />
-          <Route path="/profile" element={<UserProfile />} />
+          <Route path="/profile" element={<Profile />} />
         </Routes>
       </div>
     </Router>

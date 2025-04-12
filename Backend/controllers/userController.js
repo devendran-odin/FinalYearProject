@@ -24,15 +24,11 @@ export const register =  async (req, res) => {
       return res.status(400).json({ message: "User already exists" });
     }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // Create new user
+    // Create new user - password will be hashed by the User model's pre-save hook
     const newUser = new User({
       name,
       email,
-      password: hashedPassword,
+      password,
       role,
       field,
       otherField,
@@ -73,9 +69,20 @@ export const login = async (req, res) => {
     // Generate JWT token
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "3d" });
 
-    res.status(200).json({ message: "Login successful", token, user });
+    // Return user data without password
+    const userData = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      field: user.field,
+      otherField: user.otherField,
+      keywords: user.keywords,
+      experience: user.experience
+    };
+
+    res.status(200).json({ message: "Login successful", token, user: userData });
   } catch (error) {
-    console.error("Login error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -83,14 +90,43 @@ export const login = async (req, res) => {
 
 export const getUserProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId).select("-password");
+    const userId = req.user._id;
+    const user = await User.findById(userId).select('-password');
+    
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: 'User not found' });
     }
+
     res.json(user);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: 'Error fetching user profile', error: error.message });
+  }
+};
+
+// Update user profile
+export const updateUserProfile = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const updates = req.body;
+
+    // Remove password from updates if present
+    if (updates.password) {
+      delete updates.password;
+    }
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { $set: updates },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating user profile', error: error.message });
   }
 };
 

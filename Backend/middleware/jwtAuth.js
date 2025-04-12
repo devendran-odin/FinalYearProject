@@ -1,21 +1,31 @@
 import jwt from 'jsonwebtoken';
+import User from '../models/User.js';
 
 // Middleware to verify JWT token
-export const authenticateToken = (req, res, next) => {
-  const token = req.header("Authorization")?.replace("Bearer ", ""); // Extract the token from the header
+export const authenticateToken = async (req, res, next) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
 
-  if (!token) {
-    return res.status(401).json({ message: "Access denied. No token provided." });
-  }
-
-  // Verify the token using the secret key
-  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-    if (err) {
-      return res.status(403).json({ message: "Invalid or expired token." });
+    if (!token) {
+      return res.status(401).json({ message: 'Access denied. No token provided.' });
     }
 
-    // If the token is valid, attach the decoded payload (user info) to the request object
-    req.user = decoded; // Decoded token will have user details like userId
-    next(); // Continue to the next middleware or route handler
-  });
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const user = await User.findById(decoded.userId);
+
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid token. User not found.' });
+    }
+
+    req.user = user;
+    next();
+  } catch (error) {
+    console.error('JWT verification error:', error);
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ message: 'Token expired. Please login again.' });
+    }
+    return res.status(401).json({ message: 'Invalid token.' });
+  }
 };

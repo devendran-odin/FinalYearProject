@@ -276,7 +276,7 @@ export default function Register() {
                     <SelectContent>
                       <ScrollArea className="h-72">
                         {FIELDS_OF_INTEREST.map((f) => (
-                          <SelectItem key={f} value={f.toLowerCase()}>
+                          <SelectItem key={f} value={f}>
                             {f}
                           </SelectItem>
                         ))}
