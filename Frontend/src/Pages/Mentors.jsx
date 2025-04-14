@@ -159,7 +159,7 @@ const Mentors = () => {
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
       <div className="flex items-center mb-8">
-        <Link to="/dashboard" className="flex items-center text-gray-600 hover:text-gray-900 transition-colors">
+        <Link to="/" className="flex items-center text-gray-600 hover:text-gray-900 transition-colors">
           <ChevronLeft className="h-5 w-5 mr-1" />
           Back to Dashboard
         </Link>
@@ -172,18 +172,18 @@ const Mentors = () => {
             Connect with experienced professionals who can guide you through your learning journey
           </p>
         </div>
-        <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
+        <div className="flex flex-col md:flex-row gap-4 w-full  md:w-auto">
           <div className="relative flex-1 md:flex-none">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <Search className="absolute size-5 left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <Input
               placeholder="Search by name, experience or keywords..."
-              className="pl-10 h-11"
+              className="pl-10 h-10 border border-gray-400"
               value={searchTerm}
               onChange={handleSearchChange}
             />
           </div>
           <Select value={selectedField} onValueChange={handleFieldChange}>
-            <SelectTrigger className="w-full md:w-[200px] h-11">
+            <SelectTrigger className="w-full md:w-[200px] h-10 border border-gray-400">
               <SelectValue placeholder="Select field" />
             </SelectTrigger>
             <SelectContent>

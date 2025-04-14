@@ -8,6 +8,8 @@ import Mentors from "./Pages/Mentors";
 import Chat from "./Pages/Chat";
 import Profile from "./Pages/Profile";
 import About from "./Pages/About";
+import AiChat from "./Pages/AiChat";
+import VideoCall from './Pages/VideoCall';
 
 function App() {
   return (
@@ -31,8 +33,10 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/mentors" element={<Mentors />} />
-          <Route path="/chat" element={<Chat />} />
+          <Route path="/chat" element={<AiChat />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/video-call" element={<VideoCall />} />
+          <Route path="/video-call/:callId" element={<VideoCall />} />
         </Routes>
       </div>
     </Router>

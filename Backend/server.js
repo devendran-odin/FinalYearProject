@@ -27,9 +27,14 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: "http://localhost:5173",
-    methods: ["GET", "POST"]
-  }
+    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    methods: ["GET", "POST"],
+    credentials: true,
+    allowedHeaders: ["Content-Type"]
+  },
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  transports: ['websocket', 'polling']
 });
 
 const port = process.env.PORT || 8000;
@@ -39,91 +44,123 @@ app.use(express.json());
 
 // Socket.IO Authentication Middleware
 io.use(async (socket, next) => {
+  console.log('Authenticating socket connection...');
   const token = socket.handshake.auth.token;
+  
   if (!token) {
-    return next(new Error('Authentication error'));
+    console.log('No token provided in socket connection');
+    return next(new Error('Authentication error: No token provided'));
   }
 
   try {
+    console.log('Verifying JWT token...');
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log('Token verified, finding user...');
+    
     const user = await User.findById(decoded.userId);
     
     if (!user) {
-      return next(new Error('User not found'));
+      console.log('User not found for token:', decoded.userId);
+      return next(new Error('Authentication error: User not found'));
     }
 
+    console.log('User authenticated:', user._id);
     socket.userId = user._id;
     socket.userRole = user.role;
     next();
   } catch (err) {
-    console.error('Socket authentication error:', err);
-    next(new Error('Authentication error'));
+    console.error('Socket authentication error:', {
+      name: err.name,
+      message: err.message,
+      stack: err.stack
+    });
+    
+    if (err.name === 'JsonWebTokenError') {
+      return next(new Error('Authentication error: Invalid token'));
+    } else if (err.name === 'TokenExpiredError') {
+      return next(new Error('Authentication error: Token expired'));
+    } else {
+      return next(new Error('Authentication error: ' + err.message));
+    }
   }
 });
+
+// Store active calls
+const activeRooms = new Map();
 
 // Socket.IO Connection Handler
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
-  // Handle user joining their personal room
-  socket.on('join_room', ({ userId }) => {
-    socket.join(userId);
-    console.log(`User ${userId} joined their room`);
+  socket.on('join-room', ({ roomId }) => {
+    console.log(`User ${socket.id} joining room ${roomId}`);
+    socket.join(roomId);
+    const room = io.sockets.adapter.rooms.get(roomId);
+    const participants = Array.from(room || []);
+    
+    console.log('Room participants:', participants);
+
+    // Notify the joining user
+    socket.emit('room-joined', {
+      isCreator: participants.length === 1,
+      participants
+    });
+
+    // Notify others in the room
+    socket.to(roomId).emit('user-joined', {
+      userId: socket.id,
+      participants
+    });
   });
 
-  // Handle new messages
-  socket.on('new_message', async (message) => {
-    try {
-      // Save message to database
-      const savedMessage = await Message.create(message);
-      
-      // Get the message with populated sender and recipient
-      const populatedMessage = await Message.findById(savedMessage._id)
-        .populate('sender', 'name')
-        .populate('recipient', 'name');
-      
-      // Emit to sender's room
-      io.to(message.sender).emit('new_message', populatedMessage);
-      
-      // Emit to recipient's room
-      io.to(message.recipient).emit('new_message', populatedMessage);
-      
-      // Update chat list for both users
-      io.to(message.sender).emit('update_chat_list', { 
-        mentorId: message.recipient,
-        lastMessage: populatedMessage
-      });
-      io.to(message.recipient).emit('update_chat_list', { 
-        mentorId: message.sender,
-        lastMessage: populatedMessage
-      });
-    } catch (error) {
-      console.error('Error handling new message:', error);
-      socket.emit('error', { message: 'Failed to send message' });
-    }
+  socket.on('offer', ({ roomId, offer, senderId, targetId }) => {
+    console.log(`Routing offer from ${senderId} to ${targetId}`);
+    io.to(targetId).emit('offer', {
+      offer,
+      userId: senderId
+    });
   });
 
-  // Handle typing events
-  socket.on('typing', ({ recipientId, isTyping }) => {
-    io.to(recipientId).emit('typing', { senderId: socket.userId, isTyping });
+  socket.on('answer', ({ roomId, answer, senderId, targetId }) => {
+    console.log(`Routing answer from ${senderId} to ${targetId}`);
+    io.to(targetId).emit('answer', {
+      answer,
+      senderId
+    });
   });
 
-  // Handle read receipts
-  socket.on('mark_read', async ({ senderId }) => {
-    try {
-      await Message.updateMany(
-        { sender: senderId, recipient: socket.userId, read: false },
-        { $set: { read: true } }
-      );
-      io.to(senderId).emit('messages_read', { senderId: socket.userId });
-    } catch (error) {
-      console.error('Error marking messages as read:', error);
-    }
+  socket.on('ice-candidate', ({ roomId, candidate, senderId, targetId }) => {
+    console.log(`Routing ICE candidate from ${senderId} to ${targetId}`, {
+      type: candidate.candidate ? candidate.candidate.split(' ')[7] : 'null',
+      sdpMid: candidate.sdpMid,
+      sdpMLineIndex: candidate.sdpMLineIndex
+    });
+    
+    // Send directly to the target peer
+    io.to(targetId).emit('ice-candidate', {
+      candidate,
+      senderId
+    });
   });
 
-  // Handle disconnection
-  socket.on('disconnect', (reason) => {
-    console.log('User disconnected:', socket.id, 'Reason:', reason);
+  socket.on('leave-room', ({ roomId }) => {
+    console.log(`User ${socket.id} leaving room ${roomId}`);
+    socket.leave(roomId);
+    io.to(roomId).emit('user-left', {
+      userId: socket.id
+    });
+  });
+
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+    // Notify all rooms this user was in
+    Array.from(socket.rooms || []).forEach(roomId => {
+      if (roomId !== socket.id) {
+        io.to(roomId).emit('user-left', {
+          userId: socket.id
+        });
+      }
+    });
   });
 });
 

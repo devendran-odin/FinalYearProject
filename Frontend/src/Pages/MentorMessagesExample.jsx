@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Video, Send, ArrowLeft, UserPlus, MessageSquare } from "lucide-react";
+import { Video, Send, ArrowLeft, UserPlus, MessageSquare, Copy } from "lucide-react";
 import { format } from 'date-fns';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const MentorMessagesExample = () => {
   const location = useLocation();
@@ -25,6 +26,8 @@ const MentorMessagesExample = () => {
   const [searchParams] = useSearchParams();
   const mentorId = searchParams.get('mentor');
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [showCallDialog, setShowCallDialog] = useState(false);
+  const [callId, setCallId] = useState('');
 
   // Get current user ID from token
   useEffect(() => {
@@ -41,6 +44,9 @@ const MentorMessagesExample = () => {
         setCurrentUserId(userId);
       } catch (error) {
         console.error('Error decoding token:', error);
+        // Clear invalid token
+        localStorage.removeItem('token');
+        navigate('/login');
       }
     }
   }, []);
@@ -50,6 +56,7 @@ const MentorMessagesExample = () => {
     const token = localStorage.getItem('token');
     if (!token) {
       console.error('No token found');
+      navigate('/login');
       return;
     }
 
@@ -68,6 +75,15 @@ const MentorMessagesExample = () => {
     });
 
     // Socket event handlers
+    socketRef.current.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+      if (error.message === 'Authentication error') {
+        // Clear invalid token and redirect to login
+        localStorage.removeItem('token');
+        navigate('/login');
+      }
+    });
+
     socketRef.current.on('connect', () => {
       console.log('Socket connected');
       // Join the user's personal room
@@ -334,8 +350,18 @@ const MentorMessagesExample = () => {
     }
   };
 
-  const handleVideoCall = () => {
-    toast.error('Video call feature coming soon!');
+  const handleStartVideoCall = () => {
+    window.open('/video-call', '_blank');
+  };
+
+  const copyCallId = () => {
+    navigator.clipboard.writeText(callId);
+    toast.success('Call ID copied to clipboard!');
+  };
+
+  const startCall = () => {
+    window.open(`/video-call/${callId}`, '_blank');
+    setShowCallDialog(false);
   };
 
   const handleBack = () => {
@@ -427,20 +453,22 @@ const MentorMessagesExample = () => {
           {selectedMentor ? (
             <div className="flex-1 flex flex-col">
               {/* Chat Header */}
-              <div className="p-4 border-b bg-white flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Button variant="ghost" size="icon" onClick={handleBack} className="md:hidden">
-                    <ArrowLeft className="h-5 w-5" />
-                  </Button>
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback>{selectedMentor.name.charAt(0)}</AvatarFallback>
+              <div className="flex items-center justify-between p-4 border-b">
+                <div className="flex items-center space-x-4">
+                  <Avatar>
+                    <AvatarImage src={selectedMentor?.profilePicture} />
+                    <AvatarFallback>{selectedMentor?.name?.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <h3 className="font-semibold">{selectedMentor.name}</h3>
-                    <p className="text-sm text-gray-500">{selectedMentor.field}</p>
+                    <h2 className="text-lg font-semibold">{selectedMentor?.name}</h2>
+                    <p className="text-sm text-gray-500">{selectedMentor?.expertise}</p>
                   </div>
                 </div>
-                <Button variant="outline" size="icon" onClick={handleVideoCall}>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleStartVideoCall}
+                >
                   <Video className="h-5 w-5" />
                 </Button>
               </div>
@@ -520,6 +548,32 @@ const MentorMessagesExample = () => {
           )}
         </>
       )}
+      <Dialog open={showCallDialog} onOpenChange={setShowCallDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Start Video Call</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-500">
+              Share this call ID with the other participant to join the call:
+            </p>
+            <div className="flex items-center gap-2">
+              <Input value={callId} readOnly />
+              <Button variant="outline" size="icon" onClick={copyCallId}>
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowCallDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={startCall}>
+                Start Call
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
