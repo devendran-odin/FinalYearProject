@@ -162,6 +162,58 @@ io.on('connection', (socket) => {
       }
     });
   });
+
+  socket.on('send_message', async ({ message, recipientId }) => {
+    try {
+      if (!message || !recipientId) {
+        throw new Error('Invalid message data');
+      }
+
+      // Emit to sender's room
+      socket.emit('new_message', message);
+      
+      // Emit to recipient's room if they're connected
+      const recipientSocketId = activeRooms.get(recipientId);
+      if (recipientSocketId) {
+        io.to(recipientSocketId).emit('new_message', message);
+      }
+
+      // Update chat list for both users
+      io.to(socket.id).to(recipientSocketId).emit('update_chat_list');
+    } catch (error) {
+      console.error('Error in send_message:', error);
+      socket.emit('error', { message: 'Failed to send message' });
+    }
+  });
+
+  socket.on('mark_read', async ({ senderId }) => {
+    try {
+      if (!senderId) {
+        throw new Error('Invalid sender ID');
+      }
+
+      // Update messages as read in database
+      await Message.updateMany(
+        { 
+          sender: senderId,
+          recipient: socket.userId,
+          read: false
+        },
+        { $set: { read: true } }
+      );
+
+      // Notify sender that messages were read
+      const senderSocketId = activeRooms.get(senderId);
+      if (senderSocketId) {
+        io.to(senderSocketId).emit('messages_read', { 
+          recipientId: socket.userId 
+        });
+      }
+    } catch (error) {
+      console.error('Error in mark_read:', error);
+      socket.emit('error', { message: 'Failed to mark messages as read' });
+    }
+  });
 });
 
 // Make io instance available to controllers

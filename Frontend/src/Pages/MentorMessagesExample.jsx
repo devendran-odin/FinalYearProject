@@ -331,22 +331,51 @@ const MentorMessagesExample = () => {
       const token = localStorage.getItem('token');
       const messageToSend = {
         content: newMessage,
-        sender: currentUserId,
-        recipient: selectedMentor._id,
-        createdAt: new Date().toISOString()
+        recipientId: selectedMentor._id
       };
 
-      // Clear the input field immediately
+      // Optimistically update UI
+      const optimisticMessage = {
+        _id: Date.now().toString(), // Temporary ID
+        content: newMessage,
+        sender: currentUserId,
+        recipient: selectedMentor._id,
+        createdAt: new Date().toISOString(),
+        read: false
+      };
+
+      setMessages(prev => [...prev, optimisticMessage]);
       setNewMessage('');
       scrollToBottom();
 
-      // Emit socket event for the new message
+      // Make API call to save message
+      const response = await axios.post(
+        'http://localhost:8000/api/messages',
+        messageToSend,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+
+      // Replace optimistic message with real message from server
+      setMessages(prev => prev.map(msg => 
+        msg._id === optimisticMessage._id ? response.data : msg
+      ));
+
+      // Emit socket event for real-time updates
       if (socketRef.current) {
-        socketRef.current.emit('new_message', messageToSend);
+        socketRef.current.emit('send_message', {
+          message: response.data,
+          recipientId: selectedMentor._id
+        });
       }
     } catch (error) {
       console.error('Error sending message:', error);
       toast.error('Failed to send message');
+      // Remove optimistic message if API call failed
+      setMessages(prev => prev.filter(msg => msg._id !== optimisticMessage._id));
     }
   };
 
