@@ -20,6 +20,8 @@ const VideoCall = () => {
   const [socketStatus, setSocketStatus] = useState('disconnected');
   const [userName, setUserName] = useState('');
   const [remoteName, setRemoteName] = useState('');
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [screenStream, setScreenStream] = useState(null);
 
   const localVideoRef = useRef();
   const remoteVideoRef = useRef();
@@ -819,6 +821,89 @@ const VideoCall = () => {
     toast.success('Call ID copied to clipboard!');
   };
 
+  // Add screen sharing function
+  const toggleScreenSharing = async () => {
+    try {
+      if (!isScreenSharing) {
+        // Start screen sharing
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({
+          video: {
+            cursor: "always"
+          },
+          audio: false
+        });
+
+        // Replace video track in peer connection
+        const videoTrack = screenStream.getVideoTracks()[0];
+        const sender = peerConnection.current.getSenders().find(s => s.track.kind === 'video');
+        if (sender) {
+          sender.replaceTrack(videoTrack);
+        }
+
+        // Update local video element
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = screenStream;
+        }
+
+        setScreenStream(screenStream);
+        setIsScreenSharing(true);
+
+        // Handle screen sharing stop
+        videoTrack.onended = () => {
+          stopScreenSharing();
+        };
+      } else {
+        stopScreenSharing();
+      }
+    } catch (error) {
+      console.error('Error sharing screen:', error);
+      toast.error('Failed to share screen');
+    }
+  };
+
+  // Add function to stop screen sharing
+  const stopScreenSharing = async () => {
+    try {
+      if (screenStream) {
+        // Stop all tracks in the screen stream
+        screenStream.getTracks().forEach(track => track.stop());
+        
+        // Get the original video stream
+        const originalStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true
+        });
+
+        // Replace video track in peer connection
+        const videoTrack = originalStream.getVideoTracks()[0];
+        const sender = peerConnection.current.getSenders().find(s => s.track.kind === 'video');
+        if (sender) {
+          sender.replaceTrack(videoTrack);
+        }
+
+        // Update local video element
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = originalStream;
+        }
+
+        setScreenStream(null);
+        setIsScreenSharing(false);
+      }
+    } catch (error) {
+      console.error('Error stopping screen share:', error);
+      toast.error('Failed to stop screen sharing');
+    }
+  };
+
+  // Add cleanup for screen sharing
+  useEffect(() => {
+    return () => {
+      if (screenStream) {
+        screenStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [screenStream]);
+
   if (error) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -1030,6 +1115,26 @@ const VideoCall = () => {
           className="h-14 w-14 rounded-full shadow-lg"
         >
           {isVideoOff ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
+        </Button>
+        <Button
+          variant={isScreenSharing ? "destructive" : "default"}
+          size="icon"
+          onClick={toggleScreenSharing}
+          className="h-14 w-14 rounded-full shadow-lg"
+        >
+          {isScreenSharing ? (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+              <line x1="8" y1="21" x2="16" y2="21"></line>
+              <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+              <line x1="8" y1="21" x2="16" y2="21"></line>
+              <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+          )}
         </Button>
         <Button
           variant="destructive"

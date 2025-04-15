@@ -139,9 +139,9 @@ export default function Register() {
       if (!response.ok) {
         throw new Error(data.message || "Registration failed");
       }
-      localStorage.setItem("token", data.token);
+      // localStorage.setItem("token", data.token);
       toast.success("Registration successful!");
-      navigate("/profile");
+      navigate("/login");
       setTimeout(() => {
         window.location.reload();
       }, 300);
